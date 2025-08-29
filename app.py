@@ -12,12 +12,17 @@ df = load_data()
 
 st.title("🏈 College Football Dashboard (2024 Season)")
 
+# ----------------------------
 # Sidebar filters
+# ----------------------------
 conferences = sorted(df["conference"].dropna().unique())
 selected_conf = st.sidebar.selectbox("Select Conference", ["All"] + conferences)
 
 teams = sorted(df["team"].dropna().unique())
 selected_team = st.sidebar.selectbox("Select Team", ["All"] + teams)
+
+weeks = sorted(df["week"].dropna().unique())
+selected_week = st.sidebar.selectbox("Select Week", ["All"] + [int(w) for w in weeks])
 
 view_mode = st.sidebar.radio("View Mode", ["Team Stats", "Game Results"])
 
@@ -85,6 +90,8 @@ if selected_conf != "All":
     filtered = filtered[filtered["conference"] == selected_conf]
 if selected_team != "All":
     filtered = filtered[filtered["team"] == selected_team]
+if selected_week != "All":
+    filtered = filtered[filtered["week"] == selected_week]
 
 
 # ----------------------------
@@ -101,6 +108,7 @@ elif view_mode == "Game Results":
         st.dataframe(results_df)
     else:
         st.warning("No results available for your selection.")
+
 
 
 
