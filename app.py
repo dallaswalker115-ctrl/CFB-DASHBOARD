@@ -14,14 +14,22 @@ df = load_data()
 st.title("🏈 College Football Dashboard (2024 Season)")
 
 # ----------------------------
-# Sidebar filters
+# Sidebar controls
 # ----------------------------
+st.sidebar.header("Filters")
+
+# Toggle between Team Stats and Game Results
+view_mode = st.sidebar.radio("View Mode", ["Team Stats", "Game Results"])
+
+# Conference filter
 conferences = sorted(df["conference"].dropna().unique())
 selected_conf = st.sidebar.selectbox("Select Conference", ["All"] + conferences)
 
+# Team filter
 teams = sorted(df["team"].dropna().unique())
 selected_team = st.sidebar.selectbox("Select Team", ["All"] + teams)
 
+# Week filter
 weeks = sorted(df["week"].dropna().unique())
 selected_week = st.sidebar.selectbox("Select Week", ["All"] + [str(w) for w in weeks])
 
