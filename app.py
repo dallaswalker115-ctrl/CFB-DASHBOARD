@@ -23,9 +23,25 @@ teams = sorted(df["team"].dropna().unique())
 selected_team = st.sidebar.selectbox("Select Team", ["All"] + teams)
 
 weeks = sorted(df["week"].dropna().unique())
-selected_week = st.sidebar.selectbox("Select Week", ["All"] + [int(w) for w in weeks])
+selected_week = st.sidebar.selectbox("Select Week", ["All"] + [str(w) for w in weeks])
 
-view_mode = st.sidebar.radio("View Mode", ["Team Stats", "Game Results"])
+# Apply filters
+filtered = df.copy()
+
+if selected_conf != "All":
+    filtered = filtered[filtered["conference"] == selected_conf]
+
+if selected_team != "All":
+    # keep rows where selected team is either the 'team' column OR home/away
+    filtered = filtered[
+        (filtered["team"] == selected_team) |
+        (filtered["home_team"] == selected_team) |
+        (filtered["away_team"] == selected_team)
+    ]
+
+if selected_week != "All":
+    filtered = filtered[filtered["week"] == int(selected_week)]
+
 
 
 # ----------------------------
