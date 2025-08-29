@@ -2,38 +2,80 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 
-# Load CSV
+# ----------------------------
+# Load dataset
+# ----------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
-    df.columns = df.columns.str.strip().str.lower()
-    return df
+    return pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
 
 df = load_data()
 
-st.title("🏈 College Football Dashboard (2024 Season)")
+# ----------------------------
+# Build game results
+# ----------------------------
+def build_game_results(df):
+    results = []
+
+    for game_id, group in df.groupby("gameid"):
+        if group.shape[0] < 2:
+            continue
+
+        # home/away teams
+        home = group[group["homeaway"] == "home"]
+        away = group[group["homeaway"] == "away"]
+
+        if home.empty or away.empty:
+            continue
+
+        home = home.iloc[0]
+        away = away.iloc[0]
+
+        spread = home["spread"]
+        overunder = home["overunder"]
+
+        # spread result (from home perspective)
+        margin = home["points"] - away["points"]
+        if margin + spread > 0:
+            spread_result = "Home Covers"
+        elif margin + spread < 0:
+            spread_result = "Away Covers"
+        else:
+            spread_result = "Push"
+
+        results.append({
+            "gameid": game_id,
+            "week": home["week"],
+            "home_team": home["team"],
+            "away_team": away["team"],
+            "home_points": home["points"],
+            "away_points": away["points"],
+            "spread": spread,
+            "overunder": overunder,
+            "spread_result": spread_result
+        })
+
+    return pd.DataFrame(results)
 
 # ----------------------------
-# Sidebar controls
+# Sidebar Filters
 # ----------------------------
 st.sidebar.header("Filters")
 
-# Toggle between Team Stats and Game Results
-view_mode = st.sidebar.radio("View Mode", ["Team Stats", "Game Results"])
+confs = sorted(df["conference"].dropna().unique())
+selected_conf = st.sidebar.selectbox("Select Conference", ["All"] + confs)
 
-# Conference filter
-conferences = sorted(df["conference"].dropna().unique())
-selected_conf = st.sidebar.selectbox("Select Conference", ["All"] + conferences)
-
-# Team filter
 teams = sorted(df["team"].dropna().unique())
 selected_team = st.sidebar.selectbox("Select Team", ["All"] + teams)
 
-# Week filter
 weeks = sorted(df["week"].dropna().unique())
 selected_week = st.sidebar.selectbox("Select Week", ["All"] + [str(w) for w in weeks])
 
+view_mode = st.sidebar.radio("View Mode", ["Game Results", "Team Stats"])
+
+# ----------------------------
 # Apply filters
+# ----------------------------
 filtered = df.copy()
 
 if selected_conf != "All":
@@ -45,139 +87,43 @@ if selected_team != "All":
 if selected_week != "All":
     filtered = filtered[filtered["week"] == int(selected_week)]
 
-
-# Apply filters
-filtered = df.copy()
-
-if selected_conf != "All":
-    filtered = filtered[filtered["conference"] == selected_conf]
-
-if selected_team != "All":
-    # keep rows where selected team is either the 'team' column OR home/away
-    filtered = filtered[
-        (filtered["team"] == selected_team) |
-        (filtered["home_team"] == selected_team) |
-        (filtered["away_team"] == selected_team)
-    ]
-
-if selected_week != "All":
-    filtered = filtered[filtered["week"] == int(selected_week)]
-
-
-
 # ----------------------------
-# Build Game Results Function
+# Main View
 # ----------------------------
-def build_game_results(df):
-    if "gameid" not in df.columns:
-        st.error("❌ The CSV does not contain a 'gameid' column.")
-        return pd.DataFrame()
+st.title("🏈 College Football Dashboard (2024 Season)")
 
-    results = []
-    for game_id, group in df.groupby("gameid"):
-        if group.empty:
-            continue
-        teams = group.set_index("homeaway")
-        if "home" not in teams.index or "away" not in teams.index:
-            continue
-
-        home = teams.loc["home"]
-        away = teams.loc["away"]
-
-        home_points = home.get("points", None)
-        away_points = away.get("points", None)
-        spread = home.get("spread", None)
-        overunder = home.get("overunder", None)
-
-        # Spread Result
-        spread_result = None
-        if pd.notnull(home_points) and pd.notnull(away_points) and pd.notnull(spread):
-            margin = home_points - away_points
-            spread_result = "Cover" if margin + spread > 0 else "No Cover"
-
-        # Over/Under Result
-        ou_result = None
-        if pd.notnull(home_points) and pd.notnull(away_points) and pd.notnull(overunder):
-            total = home_points + away_points
-            if total > overunder:
-                ou_result = "Over"
-            elif total < overunder:
-                ou_result = "Under"
-            else:
-                ou_result = "Push"
-
-        results.append({
-            "Week": home["week"],
-            "Home Team": home["team"],
-            "Home Points": home_points,
-            "Away Team": away["team"],
-            "Away Points": away_points,
-            "Spread": spread,
-            "Spread Result": spread_result,
-            "O/U": overunder,
-            "O/U Result": ou_result,
-        })
-    return pd.DataFrame(results)
-
-
-# ----------------------------
-# Apply Filters
-# ----------------------------
-filtered = df.copy()
-if selected_conf != "All":
-    filtered = filtered[filtered["conference"] == selected_conf]
-if selected_team != "All":
-    filtered = filtered[filtered["team"] == selected_team]
-if selected_week != "All":
-    filtered = filtered[filtered["week"] == selected_week]
-
-
-# ----------------------------
-# Display
-# ----------------------------
-if view_mode == "Team Stats":
-    st.subheader("📊 Team Stats")
-    st.dataframe(filtered)
-
-elif view_mode == "Game Results":
-    st.subheader("🏆 Game Results")
+if view_mode == "Game Results":
     results_df = build_game_results(filtered)
-    if not results_df.empty:
+    if results_df.empty:
+        st.warning("No game results available for selection.")
+    else:
+        st.subheader("Game Results")
         st.dataframe(results_df)
 
-        # ----------------------------
-        # Charts
-        # ----------------------------
-        st.subheader("📈 Charts")
+        # Chart: Point Differentials
+        st.subheader("Point Differentials by Game")
+        plt.figure(figsize=(8,5))
+        plt.bar(results_df["home_team"] + " vs " + results_df["away_team"],
+                results_df["home_points"] - results_df["away_points"])
+        plt.xticks(rotation=90)
+        plt.ylabel("Point Differential (Home - Away)")
+        st.pyplot(plt)
 
-        # Points per Game (scatter plot home vs away)
-        fig, ax = plt.subplots()
-        ax.scatter(results_df["Home Points"], results_df["Away Points"])
-        ax.set_xlabel("Home Points")
-        ax.set_ylabel("Away Points")
-        ax.set_title("Points Scored in Games")
-        st.pyplot(fig)
-
-        # Spread Results (bar chart)
-        if "Spread Result" in results_df.columns:
-            spread_counts = results_df["Spread Result"].value_counts()
-            fig, ax = plt.subplots()
-            spread_counts.plot(kind="bar", ax=ax)
-            ax.set_title("Spread Result Distribution")
-            ax.set_ylabel("Count")
-            st.pyplot(fig)
-
-        # Over/Under Results (bar chart)
-        if "O/U Result" in results_df.columns:
-            ou_counts = results_df["O/U Result"].value_counts()
-            fig, ax = plt.subplots()
-            ou_counts.plot(kind="bar", ax=ax)
-            ax.set_title("Over/Under Result Distribution")
-            ax.set_ylabel("Count")
-            st.pyplot(fig)
-
+elif view_mode == "Team Stats":
+    if filtered.empty:
+        st.warning("No team stats available for selection.")
     else:
-        st.warning("No results available for your selection.")
+        st.subheader("Team Stats")
+        st.dataframe(filtered)
+
+        # Chart: Points per Team
+        st.subheader("Points per Team")
+        plt.figure(figsize=(8,5))
+        avg_points = filtered.groupby("team")["points"].mean().sort_values(ascending=False)
+        avg_points.plot(kind="bar")
+        plt.ylabel("Average Points")
+        st.pyplot(plt)
+
 
 
 
