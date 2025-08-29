@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+
+# Jupyter / Colab
+.ipynb_checkpoints
+*.ipynb
+
+# Streamlit
+.streamlit/
+
+# OS
+.DS_Store
+Thumbs.db
