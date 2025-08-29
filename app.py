@@ -7,6 +7,10 @@ import pandas as pd
 @st.cache_data
 def load_data():
     df = pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
+
+    # Normalize column names: lowercase, strip spaces
+    df.columns = df.columns.str.strip().str.lower()
+
     return df
 
 df = load_data()
@@ -19,9 +23,20 @@ def build_game_results(df):
     Build game-level results table from team-level stats.
     Each gameid has two rows: one home, one away.
     """
-    games = []
 
-    for game_id, group in df.groupby("gameid"):
+    # Try to detect correct game id column
+    game_id_col = None
+    for col in df.columns:
+        if col in ["gameid", "game_id", "id"]:
+            game_id_col = col
+            break
+
+    if not game_id_col:
+        st.error("❌ No gameid column found in dataset.")
+        return pd.DataFrame()
+
+    games = []
+    for game_id, group in df.groupby(game_id_col):
         if len(group) != 2:
             continue  # skip incomplete games
 
@@ -29,16 +44,16 @@ def build_game_results(df):
         away = group[group["homeaway"] == "away"].iloc[0]
 
         games.append({
-            "year": home["year"],
-            "week": home["week"],
+            "year": home.get("year"),
+            "week": home.get("week"),
             "gameid": game_id,
-            "home_team": home["team"],
-            "away_team": away["team"],
-            "home_points": home["points"],
-            "away_points": away["points"],
-            "spread": home["spread"] if "spread" in home else None,
-            "overunder": home["overunder"] if "overunder" in home else None,
-            "spread_result": home["spread_result"] if "spread_result" in home else None,
+            "home_team": home.get("team"),
+            "away_team": away.get("team"),
+            "home_points": home.get("points"),
+            "away_points": away.get("points"),
+            "spread": home.get("spread"),
+            "overunder": home.get("overunder"),
+            "spread_result": home.get("spread_result"),
         })
 
     return pd.DataFrame(games)
@@ -78,4 +93,5 @@ if team_choice != "All":
 # =============================
 st.subheader("📊 Game Results")
 st.dataframe(filtered)
+
 
