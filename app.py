@@ -15,6 +15,9 @@ df = load_data()
 # Helper: Build game results
 # ----------------------------
 def build_game_results(df):
+    if "gameid" not in df.columns:
+        return pd.DataFrame()  # nothing to build
+
     results = []
     for game_id, group in df.groupby("gameid"):
         if {"homeaway", "team", "points"}.issubset(group.columns):
@@ -97,34 +100,37 @@ if view_mode == "Team Stats":
 else:
     results_df = build_game_results(filtered)
 
-    if selected_team != "All Teams":
+    if not results_df.empty and selected_team != "All Teams":
         results_df = results_df[
             (results_df["home_team"] == selected_team) |
             (results_df["away_team"] == selected_team)
         ]
 
     st.header(f"Game Results - {selected_week if selected_week!='All Weeks' else 'All Weeks'}")
-    st.dataframe(results_df)
 
-    # ------------------------
-    # Spread chart (cumulative across ALL WEEKS)
-    # ------------------------
-    if selected_team != "All Teams":
-        # Build full results without week filter to get cumulative spread
-        full_results = build_game_results(df)
-        team_results = full_results[
-            (full_results["home_team"] == selected_team) |
-            (full_results["away_team"] == selected_team)
-        ]
+    if results_df.empty:
+        st.write("No game results available with current filters.")
+    else:
+        st.dataframe(results_df)
 
-        if not team_results.empty:
-            spread_counts = team_results["spread_result"].value_counts()
+        # ------------------------
+        # Spread chart (cumulative across ALL WEEKS)
+        # ------------------------
+        if selected_team != "All Teams":
+            full_results = build_game_results(df)  # no filters
+            team_results = full_results[
+                (full_results["home_team"] == selected_team) |
+                (full_results["away_team"] == selected_team)
+            ]
 
-            fig, ax = plt.subplots()
-            spread_counts.plot(kind="bar", ax=ax)
-            ax.set_title(f"{selected_team} Spread Results (Cumulative)")
-            ax.set_ylabel("Games")
-            st.pyplot(fig)
+            if not team_results.empty:
+                spread_counts = team_results["spread_result"].value_counts()
+
+                fig, ax = plt.subplots()
+                spread_counts.plot(kind="bar", ax=ax)
+                ax.set_title(f"{selected_team} Spread Results (Cumulative)")
+                ax.set_ylabel("Games")
+                st.pyplot(fig)
 
 
 
