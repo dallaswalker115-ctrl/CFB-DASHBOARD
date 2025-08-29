@@ -7,7 +7,9 @@ import matplotlib.pyplot as plt
 # ----------------------------
 @st.cache_data
 def load_data():
-    return pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
+    df = pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
+    df.columns = [c.lower() for c in df.columns]  # normalize names
+    return df
 
 df = load_data()
 
@@ -17,11 +19,16 @@ df = load_data()
 def build_game_results(df):
     results = []
 
-    for game_id, group in df.groupby("gameid"):
+    if "gameid" in df.columns:
+        groups = df.groupby("gameid")
+    else:
+        # fallback: group by week, match home vs away
+        groups = df.groupby(["week"])
+
+    for key, group in groups:
         if group.shape[0] < 2:
             continue
 
-        # home/away teams
         home = group[group["homeaway"] == "home"]
         away = group[group["homeaway"] == "away"]
 
@@ -31,20 +38,22 @@ def build_game_results(df):
         home = home.iloc[0]
         away = away.iloc[0]
 
-        spread = home["spread"]
-        overunder = home["overunder"]
+        spread = home.get("spread", None)
+        overunder = home.get("overunder", None)
 
         # spread result (from home perspective)
         margin = home["points"] - away["points"]
-        if margin + spread > 0:
-            spread_result = "Home Covers"
-        elif margin + spread < 0:
-            spread_result = "Away Covers"
-        else:
-            spread_result = "Push"
+        spread_result = None
+        if spread is not None:
+            if margin + spread > 0:
+                spread_result = "Home Covers"
+            elif margin + spread < 0:
+                spread_result = "Away Covers"
+            else:
+                spread_result = "Push"
 
         results.append({
-            "gameid": game_id,
+            "game_key": key,
             "week": home["week"],
             "home_team": home["team"],
             "away_team": away["team"],
@@ -109,6 +118,15 @@ if view_mode == "Game Results":
         plt.ylabel("Point Differential (Home - Away)")
         st.pyplot(plt)
 
+        # Chart: Spread Cover Rate
+        st.subheader("Spread Cover Rate")
+        cover_counts = results_df["spread_result"].value_counts(normalize=True) * 100
+        plt.figure(figsize=(6,4))
+        cover_counts.plot(kind="bar")
+        plt.ylabel("Percentage of Games (%)")
+        plt.title("Spread Results Distribution")
+        st.pyplot(plt)
+
 elif view_mode == "Team Stats":
     if filtered.empty:
         st.warning("No team stats available for selection.")
@@ -117,12 +135,13 @@ elif view_mode == "Team Stats":
         st.dataframe(filtered)
 
         # Chart: Points per Team
-        st.subheader("Points per Team")
+        st.subheader("Average Points per Team")
         plt.figure(figsize=(8,5))
         avg_points = filtered.groupby("team")["points"].mean().sort_values(ascending=False)
         avg_points.plot(kind="bar")
         plt.ylabel("Average Points")
         st.pyplot(plt)
+
 
 
 
