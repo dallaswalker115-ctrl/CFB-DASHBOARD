@@ -3,66 +3,54 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # ----------------------------
-# Load dataset
+# Load Data
 # ----------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
-    df.columns = [c.lower() for c in df.columns]  # normalize names
-    return df
+    return pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
 
 df = load_data()
 
 # ----------------------------
-# Build game results
+# Helper: Build game results
 # ----------------------------
 def build_game_results(df):
     results = []
+    for game_id, group in df.groupby("gameid"):
+        if {"homeaway", "team", "points"}.issubset(group.columns):
+            home = group[group["homeaway"] == "home"]
+            away = group[group["homeaway"] == "away"]
 
-    if "gameid" in df.columns:
-        groups = df.groupby("gameid")
-    else:
-        groups = df.groupby("week")
+            if not home.empty and not away.empty:
+                results.append({
+                    "gameid": game_id,
+                    "week": home["week"].iloc[0],
+                    "home_team": home["team"].iloc[0],
+                    "away_team": away["team"].iloc[0],
+                    "home_points": home["points"].iloc[0],
+                    "away_points": away["points"].iloc[0],
+                    "spread": home["spread"].iloc[0] if "spread" in home else None,
+                    "overunder": home["overunder"].iloc[0] if "overunder" in home else None,
+                })
 
-    for key, group in groups:
-        if group.shape[0] < 2:
-            continue
+    results_df = pd.DataFrame(results)
 
-        home = group[group["homeaway"] == "home"]
-        away = group[group["homeaway"] == "away"]
-
-        if home.empty or away.empty:
-            continue
-
-        home = home.iloc[0]
-        away = away.iloc[0]
-
-        spread = home.get("spread", None)
-        overunder = home.get("overunder", None)
-
-        # spread result (from home perspective)
-        margin = home["points"] - away["points"]
-        spread_result = None
-        if pd.notna(spread):
-            if margin + spread > 0:
-                spread_result = "Home Covers"
-            elif margin + spread < 0:
-                spread_result = "Away Covers"
+    # Add spread result (vs. home team)
+    if not results_df.empty and "spread" in results_df.columns:
+        def outcome(row):
+            if pd.isna(row["spread"]):
+                return "No Line"
+            margin = row["home_points"] - row["away_points"]
+            if margin + row["spread"] > 0:
+                return "Home Covers"
+            elif margin + row["spread"] < 0:
+                return "Away Covers"
             else:
-                spread_result = "Push"
+                return "Push"
 
-        results.append({
-            "week": home["week"],
-            "home_team": home["team"],
-            "away_team": away["team"],
-            "home_points": home["points"],
-            "away_points": away["points"],
-            "spread": spread,
-            "overunder": overunder,
-            "spread_result": spread_result
-        })
+        results_df["spread_result"] = results_df.apply(outcome, axis=1)
 
-    return pd.DataFrame(results)
+    return results_df
 
 # ----------------------------
 # Sidebar filters
@@ -70,7 +58,7 @@ def build_game_results(df):
 st.sidebar.header("Filters")
 
 weeks = sorted(df["week"].dropna().unique())
-selected_week = st.sidebar.selectbox("Select Week", weeks)
+selected_week = st.sidebar.selectbox("Select Week", ["All Weeks"] + list(weeks))
 
 conferences = sorted(df["conference"].dropna().unique())
 selected_conf = st.sidebar.multiselect("Select Conference(s)", conferences)
@@ -83,7 +71,10 @@ view_mode = st.sidebar.radio("View Mode", ["Team Stats", "Game Results"])
 # ----------------------------
 # Apply filters
 # ----------------------------
-filtered = df[df["week"] == selected_week]
+filtered = df.copy()
+
+if selected_week != "All Weeks":
+    filtered = filtered[filtered["week"] == selected_week]
 
 if selected_conf:
     filtered = filtered[filtered["conference"].isin(selected_conf)]
@@ -92,12 +83,13 @@ if selected_conf:
 # View: Team Stats
 # ----------------------------
 if view_mode == "Team Stats":
-    st.header(f"Team Stats - Week {selected_week}")
+    st.header(f"Team Stats - {selected_week if selected_week!='All Weeks' else 'All Weeks'}")
 
     if selected_team != "All Teams":
-        filtered = filtered[filtered["team"] == selected_team]
-
-    st.dataframe(filtered)
+        team_stats = filtered[filtered["team"] == selected_team]
+        st.dataframe(team_stats)
+    else:
+        st.dataframe(filtered)
 
 # ----------------------------
 # View: Game Results
@@ -111,18 +103,29 @@ else:
             (results_df["away_team"] == selected_team)
         ]
 
-    st.header(f"Game Results - Week {selected_week}")
+    st.header(f"Game Results - {selected_week if selected_week!='All Weeks' else 'All Weeks'}")
     st.dataframe(results_df)
 
-    # Spread chart per team
-    if not results_df.empty and selected_team != "All Teams":
-        spread_counts = results_df["spread_result"].value_counts()
+    # ------------------------
+    # Spread chart (cumulative across ALL WEEKS)
+    # ------------------------
+    if selected_team != "All Teams":
+        # Build full results without week filter to get cumulative spread
+        full_results = build_game_results(df)
+        team_results = full_results[
+            (full_results["home_team"] == selected_team) |
+            (full_results["away_team"] == selected_team)
+        ]
 
-        fig, ax = plt.subplots()
-        spread_counts.plot(kind="bar", ax=ax)
-        ax.set_title(f"{selected_team} Spread Results - Week {selected_week}")
-        ax.set_ylabel("Games")
-        st.pyplot(fig)
+        if not team_results.empty:
+            spread_counts = team_results["spread_result"].value_counts()
+
+            fig, ax = plt.subplots()
+            spread_counts.plot(kind="bar", ax=ax)
+            ax.set_title(f"{selected_team} Spread Results (Cumulative)")
+            ax.set_ylabel("Games")
+            st.pyplot(fig)
+
 
 
 
