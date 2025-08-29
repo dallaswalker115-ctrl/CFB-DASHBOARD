@@ -8,26 +8,26 @@ import pandas as pd
 def load_data():
     df = pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
 
-    # Normalize column names (lowercase, underscores)
+    # Normalize columns
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
 
-    # Handle possible column name variations
+    # Handle naming variations
     rename_map = {
         "home": "home_team",
         "away": "away_team",
-        "home_team_name": "home_team",
-        "away_team_name": "away_team",
+        "hometeam": "home_team",
+        "awayteam": "away_team",
+        "homepoints": "home_points",
+        "awaypoints": "away_points",
     }
     df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
 
-    # Ensure key columns exist
-    for col in ["week", "home_team", "away_team", "home_points", "away_points", "conference"]:
-        if col not in df.columns:
-            df[col] = None
-
     return df
 
+
 df = load_data()
+st.sidebar.write("Columns:", list(df.columns))
+
 
 # =============================
 # Streamlit App
