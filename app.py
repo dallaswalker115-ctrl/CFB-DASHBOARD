@@ -1,11 +1,12 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # Load CSV
 @st.cache_data
 def load_data():
     df = pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
-    df.columns = df.columns.str.strip().str.lower()  # normalize headers
+    df.columns = df.columns.str.strip().str.lower()
     return df
 
 df = load_data()
@@ -106,8 +107,41 @@ elif view_mode == "Game Results":
     results_df = build_game_results(filtered)
     if not results_df.empty:
         st.dataframe(results_df)
+
+        # ----------------------------
+        # Charts
+        # ----------------------------
+        st.subheader("📈 Charts")
+
+        # Points per Game (scatter plot home vs away)
+        fig, ax = plt.subplots()
+        ax.scatter(results_df["Home Points"], results_df["Away Points"])
+        ax.set_xlabel("Home Points")
+        ax.set_ylabel("Away Points")
+        ax.set_title("Points Scored in Games")
+        st.pyplot(fig)
+
+        # Spread Results (bar chart)
+        if "Spread Result" in results_df.columns:
+            spread_counts = results_df["Spread Result"].value_counts()
+            fig, ax = plt.subplots()
+            spread_counts.plot(kind="bar", ax=ax)
+            ax.set_title("Spread Result Distribution")
+            ax.set_ylabel("Count")
+            st.pyplot(fig)
+
+        # Over/Under Results (bar chart)
+        if "O/U Result" in results_df.columns:
+            ou_counts = results_df["O/U Result"].value_counts()
+            fig, ax = plt.subplots()
+            ou_counts.plot(kind="bar", ax=ax)
+            ax.set_title("Over/Under Result Distribution")
+            ax.set_ylabel("Count")
+            st.pyplot(fig)
+
     else:
         st.warning("No results available for your selection.")
+
 
 
 
