@@ -4,7 +4,9 @@ import pandas as pd
 # Load CSV
 @st.cache_data
 def load_data():
-    return pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
+    df = pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
+    df.columns = df.columns.str.strip().str.lower()  # normalize headers
+    return df
 
 df = load_data()
 
@@ -24,6 +26,10 @@ view_mode = st.sidebar.radio("View Mode", ["Team Stats", "Game Results"])
 # Build Game Results Function
 # ----------------------------
 def build_game_results(df):
+    if "gameid" not in df.columns:
+        st.error("❌ The CSV does not contain a 'gameid' column.")
+        return pd.DataFrame()
+
     results = []
     for game_id, group in df.groupby("gameid"):
         if group.empty:
@@ -95,6 +101,7 @@ elif view_mode == "Game Results":
         st.dataframe(results_df)
     else:
         st.warning("No results available for your selection.")
+
 
 
 
