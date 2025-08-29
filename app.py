@@ -32,6 +32,19 @@ if selected_conf != "All":
     filtered = filtered[filtered["conference"] == selected_conf]
 
 if selected_team != "All":
+    filtered = filtered[filtered["team"] == selected_team]
+
+if selected_week != "All":
+    filtered = filtered[filtered["week"] == int(selected_week)]
+
+
+# Apply filters
+filtered = df.copy()
+
+if selected_conf != "All":
+    filtered = filtered[filtered["conference"] == selected_conf]
+
+if selected_team != "All":
     # keep rows where selected team is either the 'team' column OR home/away
     filtered = filtered[
         (filtered["team"] == selected_team) |
