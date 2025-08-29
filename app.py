@@ -4,7 +4,10 @@ import pandas as pd
 # Load CSV
 @st.cache_data
 def load_data():
-    return pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
+    df = pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
+    # normalize column names
+    df.columns = df.columns.str.strip().str.lower()
+    return df
 
 df = load_data()
 
@@ -15,11 +18,16 @@ conference_choice = st.sidebar.selectbox("Select Conference", ["All"] + conferen
 teams = sorted(df["team"].dropna().unique())
 team_choice = st.sidebar.selectbox("Select Team", ["All"] + teams)
 
+weeks = sorted(df["week"].dropna().unique())
+week_choice = st.sidebar.selectbox("Select Week", ["All"] + [str(w) for w in weeks])
+
 filtered = df.copy()
 if conference_choice != "All":
     filtered = filtered[filtered["conference"] == conference_choice]
 if team_choice != "All":
     filtered = filtered[filtered["team"] == team_choice]
+if week_choice != "All":
+    filtered = filtered[filtered["week"] == int(week_choice)]
 
 # Toggle between views
 view = st.radio("📊 Select View", ["Game Results", "Team Stats"])
@@ -30,8 +38,8 @@ view = st.radio("📊 Select View", ["Game Results", "Team Stats"])
 if view == "Game Results":
     def build_game_results(df):
         results = []
-        for gameid, group in df.groupby("gameid"):
-            if group.empty: 
+        for game_id, group in df.groupby("gameid"):
+            if group.empty:
                 continue
             teams = group.set_index("homeaway")
             if "home" not in teams.index or "away" not in teams.index:
@@ -66,6 +74,7 @@ if view == "Game Results":
 elif view == "Team Stats":
     st.subheader("📈 Team Stats")
     st.dataframe(filtered)
+
 
 
 
