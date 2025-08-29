@@ -36,29 +36,39 @@ view = st.radio("📊 Select View", ["Game Results", "Team Stats"])
 # GAME RESULTS VIEW
 # ========================
 if view == "Game Results":
-    def build_game_results(df):
-        results = []
-        for game_id, group in df.groupby("gameid"):
-            if group.empty:
-                continue
-            teams = group.set_index("homeaway")
-            if "home" not in teams.index or "away" not in teams.index:
-                continue
+  def build_game_results(df):
+    results = []
+    for game_id, group in df.groupby("gameid"):
+        if group.empty:
+            continue
+        teams = group.set_index("homeaway")
+        if "home" not in teams.index or "away" not in teams.index:
+            continue
 
-            home = teams.loc["home"]
-            away = teams.loc["away"]
+        home = teams.loc["home"]
+        away = teams.loc["away"]
 
-            results.append({
-                "Week": home["week"],
-                "Home Team": home["team"],
-                "Home Points": home.get("points", None),
-                "Away Team": away["team"],
-                "Away Points": away.get("points", None),
-                "Spread": home.get("spread", None),
-                "O/U": home.get("overunder", None),
-                "Spread Result": home.get("spread_result", None),
-            })
-        return pd.DataFrame(results)
+        home_points = home.get("points", None)
+        away_points = away.get("points", None)
+        spread = home.get("spread", None)
+
+        spread_result = None
+        if pd.notnull(home_points) and pd.notnull(away_points) and pd.notnull(spread):
+            margin = home_points - away_points
+            spread_result = "Cover" if margin + spread > 0 else "No Cover"
+
+        results.append({
+            "Week": home["week"],
+            "Home Team": home["team"],
+            "Home Points": home_points,
+            "Away Team": away["team"],
+            "Away Points": away_points,
+            "Spread": spread,
+            "O/U": home.get("overunder", None),
+            "Spread Result": spread_result,
+        })
+    return pd.DataFrame(results)
+
 
     results_df = build_game_results(filtered)
 
