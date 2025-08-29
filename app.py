@@ -2,44 +2,60 @@ import streamlit as st
 import pandas as pd
 
 # =============================
-# Load Dataset (from CSV file)
+# Load Dataset
 # =============================
 @st.cache_data
 def load_data():
-    try:
-        df = pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
-    except FileNotFoundError:
-        st.error("❌ Could not find cfb_2024_week6on_stats_with_lines.csv in the repo.")
-        return pd.DataFrame()
-    
-    # Normalize column names (lowercase, strip spaces)
-    df.columns = [c.strip().lower() for c in df.columns]
+    df = pd.read_csv("cfb_2024_week6on_stats_with_lines.csv")
+
+    # Normalize column names (lowercase, underscores)
+    df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
+
+    # Ensure required columns exist
+    required = ["week", "home_team", "away_team", "home_points", "away_points", "conference"]
+    for col in required:
+        if col not in df.columns:
+            df[col] = None
+
     return df
+
+df = load_data()
 
 # =============================
 # Streamlit App
 # =============================
-st.title("🏈 College Football Dashboard (2024 Season - From CSV)")
+st.title("🏈 College Football Dashboard (2024 Season)")
 
-df = load_data()
 if df.empty:
+    st.warning("⚠️ No data loaded.")
     st.stop()
 
 # Sidebar filters
 weeks = sorted(df["week"].dropna().unique()) if "week" in df.columns else []
-teams = sorted(set(df.get("home_team", pd.Series([])).unique())
-               .union(df.get("away_team", pd.Series([])).unique()))
+teams = sorted(set(df["home_team"].dropna().unique())
+               .union(df["away_team"].dropna().unique()))
+conferences = sorted(df["conference"].dropna().unique()) if "conference" in df.columns else []
 
 week_choice = st.sidebar.selectbox("Select Week", ["All"] + list(map(str, weeks)))
 team_choice = st.sidebar.selectbox("Select Team", ["All"] + teams)
+conf_choice = st.sidebar.selectbox("Select Conference", ["All"] + conferences)
 
+# Apply filters
 filtered = df.copy()
-if week_choice != "All" and "week" in filtered.columns:
-    filtered = filtered[filtered["week"] == int(week_choice)]
-if team_choice != "All":
-    filtered = filtered[(filtered.get("home_team") == team_choice) | 
-                        (filtered.get("away_team") == team_choice)]
 
+if week_choice != "All":
+    filtered = filtered[filtered["week"] == int(week_choice)]
+
+if team_choice != "All":
+    filtered = filtered[(filtered["home_team"] == team_choice) | 
+                        (filtered["away_team"] == team_choice)]
+
+if conf_choice != "All":
+    filtered = filtered[filtered["conference"] == conf_choice]
+
+# =============================
+# Display Data
+# =============================
 st.subheader("📊 Games")
 st.dataframe(filtered)
 
@@ -57,3 +73,4 @@ if not filtered.empty and "home_points" in filtered.columns and "away_points" in
         chart_df = pd.DataFrame(list(win_counts.items()), columns=["Team", "Wins"])
         st.subheader("🏆 Wins")
         st.bar_chart(chart_df.set_index("Team"))
+
