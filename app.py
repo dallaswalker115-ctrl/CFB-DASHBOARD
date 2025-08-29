@@ -30,7 +30,7 @@ view = st.radio("📊 Select View", ["Game Results", "Team Stats"])
 if view == "Game Results":
     def build_game_results(df):
         results = []
-        for game_id, group in df.groupby("gameid"):
+        for gameid, group in df.groupby("gameid"):
             if group.empty: 
                 continue
             teams = group.set_index("homeaway")
