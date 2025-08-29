@@ -11,9 +11,17 @@ def load_data():
     # Normalize column names (lowercase, underscores)
     df.columns = [c.strip().lower().replace(" ", "_") for c in df.columns]
 
-    # Ensure required columns exist
-    required = ["week", "home_team", "away_team", "home_points", "away_points", "conference"]
-    for col in required:
+    # Handle possible column name variations
+    rename_map = {
+        "home": "home_team",
+        "away": "away_team",
+        "home_team_name": "home_team",
+        "away_team_name": "away_team",
+    }
+    df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
+
+    # Ensure key columns exist
+    for col in ["week", "home_team", "away_team", "home_points", "away_points", "conference"]:
         if col not in df.columns:
             df[col] = None
 
@@ -32,8 +40,12 @@ if df.empty:
 
 # Sidebar filters
 weeks = sorted(df["week"].dropna().unique()) if "week" in df.columns else []
-teams = sorted(set(df["home_team"].dropna().unique())
-               .union(df["away_team"].dropna().unique()))
+
+# ✅ Directly grab team names from both home & away columns
+teams = sorted(
+    pd.concat([df["home_team"].dropna(), df["away_team"].dropna()]).unique()
+)
+
 conferences = sorted(df["conference"].dropna().unique()) if "conference" in df.columns else []
 
 week_choice = st.sidebar.selectbox("Select Week", ["All"] + list(map(str, weeks)))
@@ -47,8 +59,10 @@ if week_choice != "All":
     filtered = filtered[filtered["week"] == int(week_choice)]
 
 if team_choice != "All":
-    filtered = filtered[(filtered["home_team"] == team_choice) | 
-                        (filtered["away_team"] == team_choice)]
+    filtered = filtered[
+        (filtered["home_team"] == team_choice) | 
+        (filtered["away_team"] == team_choice)
+    ]
 
 if conf_choice != "All":
     filtered = filtered[filtered["conference"] == conf_choice]
@@ -73,4 +87,5 @@ if not filtered.empty and "home_points" in filtered.columns and "away_points" in
         chart_df = pd.DataFrame(list(win_counts.items()), columns=["Team", "Wins"])
         st.subheader("🏆 Wins")
         st.bar_chart(chart_df.set_index("Team"))
+
 
